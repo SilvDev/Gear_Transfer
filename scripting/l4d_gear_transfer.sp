@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.19"
+#define PLUGIN_VERSION		"2.20"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.20 (01-Mar-2022)
+	- Plugin now fires the "give_weapon" and "weapon_given" events. Requested by "NoroHime".
 
 2.19 (19-Oct-2021)
 	- Fixed "Invalid edict" error when creating items to give. Thanks to "TBK Duy" for reporting.
@@ -1037,6 +1040,7 @@ public void Event_InstructorOn(Event event, const char[] name, bool dontBroadcas
 public Action TimerIntro(Handle timer)
 {
 	g_bRoundIntro = false;
+	return Plugin_Continue;
 }
 
 
@@ -1497,6 +1501,11 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 			CreateTimer(0.1, TimerSwapBack, GetClientUserId(client));
 		}
 
+		// Events
+		FireEventsGeneral(client, target, ent_c, type);
+		FireEventsGeneral(target, client, ent_t, type);
+
+		// Forward
 		Call_StartForward(g_hForwardSwap);
 		Call_PushCell(client);
 		Call_PushCell(target);
@@ -1522,6 +1531,10 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 			item = CreateAndEquip(target, type);
 		}
 
+		// Events
+		FireEventsGeneral(client, target, item, type);
+
+		// Forward
 		Call_StartForward(g_hForwardGive);
 		Call_PushCell(client);
 		Call_PushCell(target);
@@ -1545,6 +1558,10 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 			item = CreateAndEquip(client, type);
 		}
 
+		// Events
+		FireEventsGeneral(target, client, item, type);
+
+		// Forward
 		Call_StartForward(g_hForwardGrab);
 		Call_PushCell(client);
 		Call_PushCell(target);
@@ -1585,6 +1602,7 @@ public Action TimerSwapBack(Handle timer, int client)
 {
 	client = GetClientOfUserId(client);
 	if( client ) ClientCommand(client, "slot3");
+	return Plugin_Continue;
 }
 
 
@@ -2138,6 +2156,48 @@ void FireEventsFootlocker(int client, int target, char[] sItem)
 		hEvent.SetInt("targetid", target);
 		hEvent.Fire();
 	}
+}
+
+void FireEventsGeneral(int client, int target, int weapon, int type)
+{
+	int weaponid;
+
+	if( g_bLeft4Dead2 )
+	{
+		switch( type )
+		{
+			case TYPE_ADREN:	weaponid = 23;		// weapon_adrenaline
+			case TYPE_PILLS:	weaponid = 15;		// weapon_pain_pills
+			case TYPE_MOLO:		weaponid = 13;		// weapon_molotov
+			case TYPE_PIPE:		weaponid = 14;		// weapon_pipe_bomb
+			case TYPE_VOMIT:	weaponid = 25;		// weapon_vomitjar
+			case TYPE_FIRST:	weaponid = 12;		// weapon_first_aid_kit
+			case TYPE_EXPLO:	weaponid = 31;		// weapon_upgradepack_explosive
+			case TYPE_INCEN:	weaponid = 30;		// weapon_upgradepack_incendiary
+			case TYPE_DEFIB:	weaponid = 24;		// weapon_defibrillator
+		}
+	} else {
+		switch( type )
+		{
+			case TYPE_FIRST:	weaponid = 8;		// weapon_first_aid_kit
+			case TYPE_MOLO:		weaponid = 9;		// weapon_molotov
+			case TYPE_PIPE:		weaponid = 10;		// weapon_pipe_bomb
+			case TYPE_PILLS:	weaponid = 12;		// weapon_pain_pills
+		}
+	}
+
+	Event hEvent = CreateEvent("weapon_given");
+	hEvent.SetInt("userid", GetClientUserId(target));
+	hEvent.SetInt("giver", GetClientUserId(client));
+	hEvent.SetInt("weapon", weaponid);
+	hEvent.SetInt("weaponentid", weapon);
+	hEvent.Fire();
+
+	hEvent = CreateEvent("give_weapon");
+	hEvent.SetInt("userid", GetClientUserId(client));
+	hEvent.SetInt("recipient", GetClientUserId(target));
+	hEvent.SetInt("weapon", weaponid);
+	hEvent.Fire();
 }
 
 stock bool HasSpectator(int client)
