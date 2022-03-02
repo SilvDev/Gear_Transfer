@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.20"
+#define PLUGIN_VERSION		"2.21"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.21 (01-Mar-2022)
+	- Fixed event errors from the last update in L4D1. Thanks to "Krufftys Killers" for reporting.
 
 2.20 (01-Mar-2022)
 	- Plugin now fires the "give_weapon" and "weapon_given" events. Requested by "NoroHime".
@@ -2187,17 +2190,23 @@ void FireEventsGeneral(int client, int target, int weapon, int type)
 	}
 
 	Event hEvent = CreateEvent("weapon_given");
-	hEvent.SetInt("userid", GetClientUserId(target));
-	hEvent.SetInt("giver", GetClientUserId(client));
-	hEvent.SetInt("weapon", weaponid);
-	hEvent.SetInt("weaponentid", weapon);
-	hEvent.Fire();
+	if( hEvent )
+	{
+		hEvent.SetInt("userid", GetClientUserId(target));
+		hEvent.SetInt("giver", GetClientUserId(client));
+		hEvent.SetInt("weapon", weaponid);
+		hEvent.SetInt("weaponentid", weapon);
+		hEvent.Fire();
+	}
 
 	hEvent = CreateEvent("give_weapon");
-	hEvent.SetInt("userid", GetClientUserId(client));
-	hEvent.SetInt("recipient", GetClientUserId(target));
-	hEvent.SetInt("weapon", weaponid);
-	hEvent.Fire();
+	if( hEvent )
+	{
+		hEvent.SetInt("userid", GetClientUserId(client));
+		hEvent.SetInt("recipient", GetClientUserId(target));
+		hEvent.SetInt("weapon", weaponid);
+		hEvent.Fire();
+	}
 }
 
 stock bool HasSpectator(int client)
