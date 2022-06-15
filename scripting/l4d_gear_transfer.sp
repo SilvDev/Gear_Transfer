@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.22"
+#define PLUGIN_VERSION		"2.23"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.23 (15-Jun-2022)
+	- Changed cvar "l4d_gear_transfer_notify" to allow notifications when pills or adrenaline are transferred using the games system. Requested by "Shadowart".
 
 2.22 (08-Jun-2022)
 	- Added cvar "l4d_gear_transfer_idle" to control if items can be transferred with players who are idle. Requested by "Gold Fish".
@@ -373,8 +376,8 @@ ConVar g_hCvarAllow, g_hCvarDistGive, g_hCvarDistGrab, g_hCvarGive, g_hCvarGrab,
 ConVar g_hCvarMPGameMode;
 
 // Cvar variables
-int g_iCvarGive, g_iCvarGrab, g_iCvarMethod, g_iCvarTypes, g_iCvarTraces, g_iCvarVocalize;
-bool g_bCvarNotify, g_bCvarSounds, g_bCvarIdle;
+int g_iCvarGive, g_iCvarGrab, g_iCvarMethod, g_iCvarNotify, g_iCvarTypes, g_iCvarTraces, g_iCvarVocalize;
+bool g_bCvarSounds, g_bCvarIdle;
 float g_fDistGive, g_fDistGrab, g_fTimerGive, g_fTimerGrab, g_fCvarTimeout, g_fBlockVocalize;
 
 // Variables
@@ -614,7 +617,7 @@ public void OnPluginStart()
 	g_hCvarModesOn =		CreateConVar(	"l4d_gear_transfer_modes_on",		"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
 	g_hCvarModesOff =		CreateConVar(	"l4d_gear_transfer_modes_off",		"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
 	g_hCvarModesTog =		CreateConVar(	"l4d_gear_transfer_modes_tog",		"0",			"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
-	g_hCvarNotify =			CreateConVar(	"l4d_gear_transfer_notify",			"1",			"0=Off, 1=Display transfer info to everyone through chat messages.", CVAR_FLAGS);
+	g_hCvarNotify =			CreateConVar(	"l4d_gear_transfer_notify",			"1",			"0=Off, 1=Display transfer info to everyone through chat messages. 2=Also display when transferring pills or adrenaline via the games own system.", CVAR_FLAGS);
 	g_hCvarSounds =			CreateConVar(	"l4d_gear_transfer_sounds",			"1",			"0=Off, 1=Play a sound to the person giving/receiving an item.", CVAR_FLAGS);
 	g_hCvarTimeout =		CreateConVar(	"l4d_gear_transfer_timeout",		"5.0",			"Timeout to stop bots returning an item after switching with a player. Timeout to prevent bots auto grabbing a recently dropped item.", CVAR_FLAGS, true, 1.0);
 	g_hCvarTraces =			CreateConVar(	"l4d_gear_transfer_traces",			"15",			"Maximum number of ray traces per frame for auto give/grab. This could be increased with minimal impact.", CVAR_FLAGS, true, 1.0, true, 120.0);
@@ -779,7 +782,7 @@ void GetCvars()
 	g_fDistGrab = g_hCvarDistGrab.FloatValue;
 	g_bCvarIdle = g_hCvarIdle.BoolValue;
 	g_iCvarMethod = g_hCvarMethod.IntValue;
-	g_bCvarNotify = g_hCvarNotify.BoolValue;
+	g_iCvarNotify = g_hCvarNotify.IntValue;
 	g_bCvarSounds = g_hCvarSounds.BoolValue;
 	g_fCvarTimeout = g_hCvarTimeout.FloatValue;
 	g_fTimerGive = g_hCvarTimerGive.FloatValue;
@@ -1101,7 +1104,7 @@ void Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
 	static char classname[10];
 	event.GetString("weapon", classname, sizeof(classname));
 
-	if( strcmp(classname, "pipe_bomb") == 0 || strcmp(classname, "molotov") == 0 || strcmp(classname, "vomitjar") == 0 )
+	if( strcmp(classname, "pipe_bomb") == 0 || strcmp(classname, "molotov") == 0 || (g_bLeft4Dead2 && strcmp(classname, "vomitjar") == 0) )
 	{
 		SetNextTransfer(client, 2.0);
 	}
@@ -1115,21 +1118,35 @@ void Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
 // This event stops pills/adren being auto given by bots after you have given to them, and stops you taking it back straight away
 void Event_WeaponGiven(Event event, const char[] name, bool dontBroadcast)
 {
-	int client = GetClientOfUserId(event.GetInt("giver"));
-	if( !IsFakeClient(client) )
-		SetNextTransfer(client, 2.0);
+	int giver = GetClientOfUserId(event.GetInt("giver"));
+	if( !IsFakeClient(giver) )
+		SetNextTransfer(giver, 2.0);
 
-	if( g_iCvarGive )
+	int weapon = event.GetInt("weapon");
+	if( weapon == 15 || weapon == 23 )
 	{
-		int weapon = event.GetInt("weapon");
+		int client = GetClientOfUserId(event.GetInt("userid"));
 
-		if( weapon == 15 || weapon == 23 )
+		if( g_iCvarNotify == 2 && g_fNextTransfer[client] < GetGameTime() )
 		{
-			client = GetClientOfUserId(event.GetInt("userid"));
-			if( IsFakeClient(client) )
+			int type;
+
+			if( weapon == 23 )
+				type = 0;
+			else
+				type = 1;
+
+			if( g_bTranslationNew )
 			{
-				SetNextTransfer(client, 3.0);
+				MPrintToChatAll(giver, "Gave", g_sPickups[type], client);
 			}
+			else
+				CPrintToChatAll("GE \x05%N \x01%t \x04%t \x01%t \x05%N", giver, "Gave", g_sPickups[type], "To", client);
+		}
+
+		if( g_iCvarGive && IsFakeClient(client) )
+		{
+			SetNextTransfer(client, 3.0);
 		}
 	}
 }
@@ -1442,7 +1459,7 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 	}
 
 	// Notification
-	if( g_bCvarNotify && g_bTranslation && GetGameTime() > g_fBlockVocalize )
+	if( g_iCvarNotify && g_bTranslation && GetGameTime() > g_fBlockVocalize )
 	{
 		if( transferType == METHOD_GIVE )
 		{
@@ -1694,7 +1711,7 @@ void TempTimerToggle()
 	delete g_hTimerGive;
 	delete g_hTimerGrab;
 
-	if( !g_bCvarAllow || g_bRoundOver || g_bModeOffAuto )		return;
+	if( !g_bCvarAllow || g_bRoundOver || g_bModeOffAuto ) return;
 
 	if( g_iCvarGive && g_fTimerGive )		g_hTimerGive = CreateTimer(g_fTimerGive, TimerAutoGive, _, TIMER_REPEAT);
 	if( g_iCvarGrab && g_fTimerGrab )		g_hTimerGrab = CreateTimer(g_fTimerGrab, TimerAutoGrab, _, TIMER_REPEAT);
@@ -2114,7 +2131,7 @@ Action TimerAutoGrab(Handle timer)
 
 						Vocalize(bot, type);
 
-						if( g_bCvarNotify && g_bTranslation && times > g_fBlockVocalize )
+						if( g_iCvarNotify && g_bTranslation && times > g_fBlockVocalize )
 						{
 							if( g_bTranslationNew )
 								MPrintToChatAll(bot, "BotGrabbed", g_sPickups[type], 0);
@@ -2471,9 +2488,9 @@ void CPrintToChatAll(const char[] format, any ...)
 
 void MPrintToChatAll(int client, const char[] phrase, const char[] item, int target)
 {
-	char clientName[192] = "";
-	char targetName[192] = "";
-	char pickupItem[192] = "";
+	static char clientName[192];
+	static char targetName[192];
+	static char pickupItem[192];
 
 	for( int i = 1; i <= MaxClients; i++ )
 	{
@@ -2504,6 +2521,8 @@ stock char[] Translate(int client, const char[] format, any ...)
 	VFormat(buffer, sizeof(buffer), format, 3);
 	return buffer;
 }
+
+
 
 /// ====================================================================================================
 //					TRACE RAY
