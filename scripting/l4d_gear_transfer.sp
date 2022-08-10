@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.23"
+#define PLUGIN_VERSION		"2.24"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.24 (10-Aug-2022)
+	- Bots no longer give health items when using it themselves. Requested by "TBK Duy".
 
 2.23 (15-Jun-2022)
 	- Changed cvar "l4d_gear_transfer_notify" to allow notifications when pills or adrenaline are transferred using the games system. Requested by "Shadowart".
@@ -1763,14 +1766,14 @@ Action TimerAutoGive(Handle timer)
 	{
 		lastBot = bot + 1;
 
+		// Transferred recently
+		if( GetGameTime() < g_fNextTransfer[bot] )
+			continue;
+
 		// Make sure bot is team survivor and alive
 		// Don't allow transfers while incapped/reviving
 		if( IsClientInGame(bot) && GetClientTeam(bot) == 2 && IsPlayerAlive(bot) && IsFakeClient(bot) && !IsReviving(bot) && !IsIncapped(bot) && HasSpectator(bot) == false )
 		{
-			// Transferred recently
-			if( GetGameTime() < g_fNextTransfer[bot] )
-				continue;
-
 			// Loop through weapon slots
 			for( slot = 0; slot < 3; slot++ )
 			{
@@ -1782,8 +1785,15 @@ Action TimerAutoGive(Handle timer)
 
 					// Bot has item in slot, and owner is bot. FIXME: Entity not handled after equip, could be invalid.
 					entity = g_iClientItem[bot][slot];
+
 					if( IsValidEntRef(entity) == true && GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity") == bot )
 					{
+						// Prevent auto give when bot using healing
+						if( slot > 0 && GetEntProp(bot, Prop_Send, "m_iCurrentUseAction") == 1 )
+						{
+							continue;
+						}
+
 						// Validate range
 						GetClientEyePosition(bot, vBot);
 
@@ -1793,6 +1803,7 @@ Action TimerAutoGive(Handle timer)
 							// Transferred recently
 							if( GetGameTime() < g_fNextTransfer[player] )
 								continue;
+
 							if( targetValid[player] == 0 )
 							{
 								targetValid[player] = 1;
