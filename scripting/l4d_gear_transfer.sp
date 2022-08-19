@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.25"
+#define PLUGIN_VERSION		"2.26"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.26 (19-Aug-2022)
+	- Fixed plugin not loading without "Heartbeat" plugin due to the last update. Thanks to "alasfourom" for reporting.
 
 2.25 (19-Aug-2022)
 	- Added cvar "l4d_gear_transfer_dying" to only give healing items when someone is black and white.
@@ -585,6 +588,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 		strcopy(error, err_max, "Plugin only supports Left 4 Dead 1 & 2.");
 		return APLRes_SilentFailure;
 	}
+
+	MarkNativeAsOptional("Heartbeat_GetRevives");
 
 	g_hForwardGive = new GlobalForward("GearTransfer_OnWeaponGive",						ET_Event, Param_Cell, Param_Cell, Param_Cell);
 	g_hForwardGrab = new GlobalForward("GearTransfer_OnWeaponGrab",						ET_Event, Param_Cell, Param_Cell, Param_Cell);
