@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.24"
+#define PLUGIN_VERSION		"2.25"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,10 @@
 
 ========================================================================================
 	Change Log:
+
+2.25 (19-Aug-2022)
+	- Added cvar "l4d_gear_transfer_dying" to only give healing items when someone is black and white.
+	- This option is compatible with the "Heartbeat (Revive Fix - Post Revive Options)" plugin.
 
 2.24 (10-Aug-2022)
 	- Bots no longer give health items when using it themselves. Requested by "TBK Duy".
@@ -375,11 +379,11 @@
 
 
 // Cvar handles
-ConVar g_hCvarAllow, g_hCvarDistGive, g_hCvarDistGrab, g_hCvarGive, g_hCvarGrab, g_hCvarIdle, g_hCvarMethod, g_hCvarModesBot, g_hCvarModesOn, g_hCvarModesOff, g_hCvarModesTog, g_hCvarNotify, g_hCvarSounds, g_hCvarTimeout, g_hCvarTimerGive, g_hCvarTimerGrab, g_hCvarTraces, g_hCvarTypes, g_hCvarVocalize;
-ConVar g_hCvarMPGameMode;
+ConVar g_hCvarAllow, g_hCvarDying, g_hCvarDistGive, g_hCvarDistGrab, g_hCvarGive, g_hCvarGrab, g_hCvarIdle, g_hCvarMethod, g_hCvarModesBot, g_hCvarModesOn, g_hCvarModesOff, g_hCvarModesTog, g_hCvarNotify, g_hCvarSounds, g_hCvarTimeout, g_hCvarTimerGive, g_hCvarTimerGrab, g_hCvarTraces, g_hCvarTypes, g_hCvarVocalize;
+ConVar g_hCvarMPGameMode, g_hCvarMaxIncap;
 
 // Cvar variables
-int g_iCvarGive, g_iCvarGrab, g_iCvarMethod, g_iCvarNotify, g_iCvarTypes, g_iCvarTraces, g_iCvarVocalize;
+int g_iCvarMaxIncap, g_iCvarDying, g_iCvarGive, g_iCvarGrab, g_iCvarMethod, g_iCvarNotify, g_iCvarTypes, g_iCvarTraces, g_iCvarVocalize;
 bool g_bCvarSounds, g_bCvarIdle;
 float g_fDistGive, g_fDistGrab, g_fTimerGive, g_fTimerGrab, g_fCvarTimeout, g_fBlockVocalize;
 
@@ -390,6 +394,10 @@ GlobalForward g_hForwardGive, g_hForwardGrab, g_hForwardSwap;
 
 // Timer handles
 Handle g_hTimerGrab, g_hTimerGive;
+
+// From "Heartbeat" plugin
+bool g_bPluginHeartbeat;
+native int Heartbeat_GetRevives(int client);
 
 // Arrays for entities
 float g_fNextTransfer[MAXPLAYERS+1];	// Next time allowed to transfer
@@ -517,35 +525,8 @@ static const char g_Zoey[10][] =
 
 
 // ====================================================================================================
-//					PLUGIN INFO / START / END
+//					FORWARDS
 // ====================================================================================================
-public Plugin myinfo =
-{
-	name = "[L4D & L4D2] Gear Transfer",
-	author = "SilverShot",
-	description = "Survivor bots can automatically pickup and give items. Players can switch, grab or give items.",
-	version = PLUGIN_VERSION,
-	url = "https://forums.alliedmods.net/showthread.php?t=137616"
-}
-
-public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
-{
-	EngineVersion test = GetEngineVersion();
-	if( test == Engine_Left4Dead ) g_bLeft4Dead2 = false;
-	else if( test == Engine_Left4Dead2 ) g_bLeft4Dead2 = true;
-	else
-	{
-		strcopy(error, err_max, "Plugin only supports Left 4 Dead 1 & 2.");
-		return APLRes_SilentFailure;
-	}
-
-	g_hForwardGive = new GlobalForward("GearTransfer_OnWeaponGive",						ET_Event, Param_Cell, Param_Cell, Param_Cell);
-	g_hForwardGrab = new GlobalForward("GearTransfer_OnWeaponGrab",						ET_Event, Param_Cell, Param_Cell, Param_Cell);
-	g_hForwardSwap = new GlobalForward("GearTransfer_OnWeaponSwap",						ET_Event, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
-
-	return APLRes_Success;
-}
-
 /**
  * @brief Called whenever a player or bot gives an item to someone
  *
@@ -582,6 +563,52 @@ forward void GearTransfer_OnWeaponSwap(int client, int target, int itemGiven, in
 
 
 
+// ====================================================================================================
+//					PLUGIN INFO / START / END
+// ====================================================================================================
+public Plugin myinfo =
+{
+	name = "[L4D & L4D2] Gear Transfer",
+	author = "SilverShot",
+	description = "Survivor bots can automatically pickup and give items. Players can switch, grab or give items.",
+	version = PLUGIN_VERSION,
+	url = "https://forums.alliedmods.net/showthread.php?t=137616"
+}
+
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
+{
+	EngineVersion test = GetEngineVersion();
+	if( test == Engine_Left4Dead ) g_bLeft4Dead2 = false;
+	else if( test == Engine_Left4Dead2 ) g_bLeft4Dead2 = true;
+	else
+	{
+		strcopy(error, err_max, "Plugin only supports Left 4 Dead 1 & 2.");
+		return APLRes_SilentFailure;
+	}
+
+	g_hForwardGive = new GlobalForward("GearTransfer_OnWeaponGive",						ET_Event, Param_Cell, Param_Cell, Param_Cell);
+	g_hForwardGrab = new GlobalForward("GearTransfer_OnWeaponGrab",						ET_Event, Param_Cell, Param_Cell, Param_Cell);
+	g_hForwardSwap = new GlobalForward("GearTransfer_OnWeaponSwap",						ET_Event, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
+
+	return APLRes_Success;
+}
+
+public void OnLibraryAdded(const char[] name)
+{
+	if( strcmp(name, "l4d_heartbeat") == 0 )
+	{
+		g_bPluginHeartbeat = true;
+	}
+}
+
+public void OnLibraryRemoved(const char[] name)
+{
+	if( strcmp(name, "l4d_heartbeat") == 0 )
+	{
+		g_bPluginHeartbeat = false;
+	}
+}
+
 public void OnPluginStart()
 {
 	// Translations
@@ -607,23 +634,24 @@ public void OnPluginStart()
 
 	// Cvars
 	g_hCvarAllow =			CreateConVar(	"l4d_gear_transfer_allow",			"1",			"0=Plugin Off, 1=Plugin On.", CVAR_FLAGS);
-	g_hCvarDistGive =		CreateConVar(	"l4d_gear_transfer_dist_give",		"150.0",		"How close you have to be to transfer an item. Also affects bots auto give range.", CVAR_FLAGS);
-	g_hCvarDistGrab =		CreateConVar(	"l4d_gear_transfer_dist_grab",		"150.0",		"How close the bots need to be for them to pick up an item.", CVAR_FLAGS);
-	g_hCvarTimerGive =		CreateConVar(	"l4d_gear_transfer_timer_give",		"1.0",			"0.0=Off. How often to check survivor bot positions to real clients for auto give.", CVAR_FLAGS, true, 0.0, true, 10.0);
-	g_hCvarTimerGrab =		CreateConVar(	"l4d_gear_transfer_timer_grab",		"0.5",			"0.0=Off. How often to check survivor bot positions to item positions for auto grab.", CVAR_FLAGS, true, 0.0, true, 10.0);
-	g_hCvarGive =			CreateConVar(	"l4d_gear_transfer_types_give",		"123456789",	"Which type can bots auto give. 0=Off. 1=Adrenaline, 2=Pain Pills, 3=Molotov, 4=Pipe Bomb, 5=Vomit Jar, 6=First Aid, 7=Explosive Rounds, 8=Incendiary Rounds, 9=Defibrillator. Any string combination.", CVAR_FLAGS);
-	g_hCvarGrab =			CreateConVar(	"l4d_gear_transfer_types_grab",		"123456789",	"Which type can bots auto grab. 0=Off. 1=Adrenaline, 2=Pain Pills, 3=Molotov, 4=Pipe Bomb, 5=Vomit Jar, 6=First Aid, 7=Explosive Rounds, 8=Incendiary Rounds, 9=Defibrillator. Any string combination.", CVAR_FLAGS);
-	g_hCvarTypes =			CreateConVar(	"l4d_gear_transfer_types_real",		"123456789",	"The types real players can transfer. 0=Off. 1=Adrenaline, 2=Pain Pills, 3=Molotov, 4=Pipe Bomb, 5=Vomit Jar, 6=First Aid, 7=Explosive Rounds, 8=Incendiary Rounds, 9=Defibrillator. Any string combination.", CVAR_FLAGS);
-	g_hCvarIdle =			CreateConVar(	"l4d_gear_transfer_idle",			"0",			"0=No, 1=Yes. Can items be transferred with idle players, players will be able to grab and switch items with idle players.", CVAR_FLAGS);
-	g_hCvarMethod =			CreateConVar(	"l4d_gear_transfer_method",			"3",			"0=Off. 1=Shove only, 2=Reload key only, 3=Shove and Reload key to transfer items.", CVAR_FLAGS);
 	g_hCvarModesBot =		CreateConVar(	"l4d_gear_transfer_modes_bot",		"",				"Disallow bots from auto give/grab in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
 	g_hCvarModesOn =		CreateConVar(	"l4d_gear_transfer_modes_on",		"",				"Turn on the plugin in these game modes, separate by commas (no spaces). (Empty = all).", CVAR_FLAGS );
 	g_hCvarModesOff =		CreateConVar(	"l4d_gear_transfer_modes_off",		"",				"Turn off the plugin in these game modes, separate by commas (no spaces). (Empty = none).", CVAR_FLAGS );
 	g_hCvarModesTog =		CreateConVar(	"l4d_gear_transfer_modes_tog",		"0",			"Turn on the plugin in these game modes. 0=All, 1=Coop, 2=Survival, 4=Versus, 8=Scavenge. Add numbers together.", CVAR_FLAGS );
+	g_hCvarDistGive =		CreateConVar(	"l4d_gear_transfer_dist_give",		"150.0",		"How close you have to be to transfer an item. Also affects bots auto give range.", CVAR_FLAGS);
+	g_hCvarDistGrab =		CreateConVar(	"l4d_gear_transfer_dist_grab",		"150.0",		"How close the bots need to be for them to pick up an item.", CVAR_FLAGS);
+	g_hCvarDying =			CreateConVar(	"l4d_gear_transfer_dying",			"0",			"Bots only auto give when their receiver is black and white. 0=Ignored. 1=First Aid. 2=Pills or Adrenaline (game logic will give anyway, unless using Bot Healing plugin). 3=Both.", CVAR_FLAGS);
+	g_hCvarIdle =			CreateConVar(	"l4d_gear_transfer_idle",			"0",			"0=No, 1=Yes. Can items be transferred with idle players, players will be able to grab and switch items with idle players.", CVAR_FLAGS);
+	g_hCvarMethod =			CreateConVar(	"l4d_gear_transfer_method",			"3",			"0=Off. 1=Shove only, 2=Reload key only, 3=Shove and Reload key to transfer items.", CVAR_FLAGS);
 	g_hCvarNotify =			CreateConVar(	"l4d_gear_transfer_notify",			"1",			"0=Off, 1=Display transfer info to everyone through chat messages. 2=Also display when transferring pills or adrenaline via the games own system.", CVAR_FLAGS);
 	g_hCvarSounds =			CreateConVar(	"l4d_gear_transfer_sounds",			"1",			"0=Off, 1=Play a sound to the person giving/receiving an item.", CVAR_FLAGS);
+	g_hCvarTimerGive =		CreateConVar(	"l4d_gear_transfer_timer_give",		"1.0",			"0.0=Off. How often to check survivor bot positions to real clients for auto give.", CVAR_FLAGS, true, 0.0, true, 10.0);
+	g_hCvarTimerGrab =		CreateConVar(	"l4d_gear_transfer_timer_grab",		"0.5",			"0.0=Off. How often to check survivor bot positions to item positions for auto grab.", CVAR_FLAGS, true, 0.0, true, 10.0);
 	g_hCvarTimeout =		CreateConVar(	"l4d_gear_transfer_timeout",		"5.0",			"Timeout to stop bots returning an item after switching with a player. Timeout to prevent bots auto grabbing a recently dropped item.", CVAR_FLAGS, true, 1.0);
 	g_hCvarTraces =			CreateConVar(	"l4d_gear_transfer_traces",			"15",			"Maximum number of ray traces per frame for auto give/grab. This could be increased with minimal impact.", CVAR_FLAGS, true, 1.0, true, 120.0);
+	g_hCvarGive =			CreateConVar(	"l4d_gear_transfer_types_give",		"123456789",	"Which type can bots auto give. 0=Off. 1=Adrenaline, 2=Pain Pills, 3=Molotov, 4=Pipe Bomb, 5=Vomit Jar, 6=First Aid, 7=Explosive Rounds, 8=Incendiary Rounds, 9=Defibrillator. Any string combination.", CVAR_FLAGS);
+	g_hCvarGrab =			CreateConVar(	"l4d_gear_transfer_types_grab",		"123456789",	"Which type can bots auto grab. 0=Off. 1=Adrenaline, 2=Pain Pills, 3=Molotov, 4=Pipe Bomb, 5=Vomit Jar, 6=First Aid, 7=Explosive Rounds, 8=Incendiary Rounds, 9=Defibrillator. Any string combination.", CVAR_FLAGS);
+	g_hCvarTypes =			CreateConVar(	"l4d_gear_transfer_types_real",		"123456789",	"The types real players can transfer. 0=Off. 1=Adrenaline, 2=Pain Pills, 3=Molotov, 4=Pipe Bomb, 5=Vomit Jar, 6=First Aid, 7=Explosive Rounds, 8=Incendiary Rounds, 9=Defibrillator. Any string combination.", CVAR_FLAGS);
 	g_hCvarVocalize =		CreateConVar(	"l4d_gear_transfer_vocalize",		"1",			"0=Off. 1=Players vocalize when transferring items. Blocked for the first 60 seconds of a new round.", CVAR_FLAGS);
 	CreateConVar(							"l4d_gear_transfer_version",		PLUGIN_VERSION, "Gear Transfer plugin version.", FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	AutoExecConfig(true,					"l4d_gear_transfer");
@@ -636,9 +664,16 @@ public void OnPluginStart()
 	g_hCvarAllow.AddChangeHook(ConVarChanged_Allow);
 	g_hCvarModesBot.AddChangeHook(ConVarChanged_AutoMode);
 
+	if( !g_bLeft4Dead2 )
+	{
+		g_hCvarMaxIncap = FindConVar("survivor_max_incapacitated_count");
+		g_hCvarMaxIncap.AddChangeHook(ConVarChanged_Cvars);
+	}
+
 	g_hCvarGive.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarGrab.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarTypes.AddChangeHook(ConVarChanged_Cvars);
+	g_hCvarDying.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarDistGive.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarDistGrab.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarIdle.AddChangeHook(ConVarChanged_Cvars);
@@ -778,9 +813,13 @@ void ConVarChanged_Cvars(Handle convar, const char[] oldValue, const char[] newV
 
 void GetCvars()
 {
+	if( !g_bLeft4Dead2 )
+		g_iCvarMaxIncap = g_hCvarMaxIncap.IntValue;
+
 	g_iCvarGive = GetEnum(g_hCvarGive);
 	g_iCvarGrab = GetEnum(g_hCvarGrab);
 	g_iCvarTypes = GetEnum(g_hCvarTypes);
+	g_iCvarDying = g_hCvarDying.IntValue;
 	g_fDistGive = g_hCvarDistGive.FloatValue;
 	g_fDistGrab = g_hCvarDistGrab.FloatValue;
 	g_bCvarIdle = g_hCvarIdle.BoolValue;
@@ -1823,6 +1862,36 @@ Action TimerAutoGive(Handle timer)
 									// Range check
 									if( GetVectorDistance(vBot, targetPos[player]) <= g_fDistGive )
 									{
+										// Validate receiver is black and white for first aid/pills/adrenaline
+										if( g_iCvarDying )
+										{
+											switch( type -1 )
+											{
+												case TYPE_FIRST:
+												{
+													if( g_iCvarDying != 2 )
+													{
+														// Check B&W
+														if( g_bLeft4Dead2 ? GetEntProp(player, Prop_Send, "m_bIsOnThirdStrike") == 0 : (g_bPluginHeartbeat ? Heartbeat_GetRevives(player) : GetEntProp(player, Prop_Send, "m_currentReviveCount")) < g_iCvarMaxIncap )
+														{
+															continue;
+														}
+													}
+												}
+												case TYPE_ADREN, TYPE_PILLS:
+												{
+													if( g_iCvarDying != 1 )
+													{
+														// Check B&W
+														if( g_bLeft4Dead2 ? GetEntProp(player, Prop_Send, "m_bIsOnThirdStrike") == 0 : (g_bPluginHeartbeat ? Heartbeat_GetRevives(player) : GetEntProp(player, Prop_Send, "m_currentReviveCount")) < g_iCvarMaxIncap )
+														{
+															continue;
+														}
+													}
+												}
+											}
+										}
+
 										// Is visible to target
 										frameTraces++;
 
