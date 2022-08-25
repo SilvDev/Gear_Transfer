@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.26"
+#define PLUGIN_VERSION		"2.27"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.27 (25-Aug-2022)
+	- Fixed property not found errors. Thanks to "haiping567" and "Dominatez" for reporting.
 
 2.26 (19-Aug-2022)
 	- Fixed plugin not loading without "Heartbeat" plugin due to the last update. Thanks to "alasfourom" for reporting.
@@ -1816,8 +1819,18 @@ Action TimerAutoGive(Handle timer)
 
 		// Make sure bot is team survivor and alive
 		// Don't allow transfers while incapped/reviving
-		if( IsClientInGame(bot) && GetClientTeam(bot) == 2 && IsPlayerAlive(bot) && IsFakeClient(bot) && !IsReviving(bot) && !IsIncapped(bot) && HasSpectator(bot) == false )
+		if( IsClientInGame(bot) && GetClientTeam(bot) == 2 && IsPlayerAlive(bot) && IsFakeClient(bot) && !IsReviving(bot) && !IsIncapped(bot) )
 		{
+			// Spectator check moved to here, to re-use the netclass below
+			static char netclass[12];
+			GetEntityNetClass(bot, netclass, sizeof(netclass));
+
+			if( !g_bCvarIdle )
+			{
+				if( strcmp(netclass, "SurvivorBot") == 0 && GetEntProp(bot, Prop_Send, "m_humanSpectatorUserID") != 0 )
+					continue;
+			}
+
 			// Loop through weapon slots
 			for( slot = 0; slot < 3; slot++ )
 			{
@@ -1833,7 +1846,7 @@ Action TimerAutoGive(Handle timer)
 					if( IsValidEntRef(entity) == true && GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity") == bot )
 					{
 						// Prevent auto give when bot using healing
-						if( slot > 0 && GetEntProp(bot, Prop_Send, "m_iCurrentUseAction") == 1 )
+						if( slot > 0 && FindSendPropInfo(netclass, "m_iCurrentUseAction") != -1 && GetEntProp(bot, Prop_Send, "m_iCurrentUseAction") == 1 )
 						{
 							continue;
 						}
