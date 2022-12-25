@@ -32,10 +32,10 @@
 ========================================================================================
 	Change Log:
 
-2.28 (24-Dec-2022)
-	- Added Simplified Chinese translations. Thanks to "a2121858" for providing.
-	- Added cvar "l4d_gear_transfer_notifies" to determine which types of transfers will be notified in chat. Requested by "Yabi".
-	- Changed cvar "l4d_gear_transfer_notify" to only print to participants of transfers and option to ignore pills/adrenaline transfers. Requested by "Yabi".
+2.28 (25-Dec-2022)
+	- Added Simplified Chinese translations. Thanks to "NoroHime" and "a2121858" for providing.
+	- Added cvar "l4d_gear_transfer_notifies" to determine the types of transfers that will be notified in chat. Requested by "Yabi".
+	- Changed cvar "l4d_gear_transfer_notify" added an option to only print to participants of transfers and an option to ignore pills/adrenaline transfers. Requested by "Yabi".
 
 2.27 (25-Aug-2022)
 	- Fixed property not found errors. Thanks to "haiping567" and "Dominatez" for reporting.
@@ -676,7 +676,7 @@ public void OnPluginStart()
 	g_hCvarIdle =			CreateConVar(	"l4d_gear_transfer_idle",			"0",			"0=No, 1=Yes. Can items be transferred with idle players, players will be able to grab and switch items with idle players.", CVAR_FLAGS);
 	g_hCvarMethod =			CreateConVar(	"l4d_gear_transfer_method",			"3",			"0=Off. 1=Shove only, 2=Reload key only, 3=Shove and Reload key to transfer items.", CVAR_FLAGS);
 	g_hCvarNotifies =		CreateConVar(	"l4d_gear_transfer_notifies",		"7",			"Notify on these types of transfers: 1=Give, 2=Grab, 4=Switch, 7=All. Add numbers together.", CVAR_FLAGS);
-	g_hCvarNotify =			CreateConVar(	"l4d_gear_transfer_notify",			"1",			"0=Off, 1=Display transfer info to everyone, 2=Also display when transferring pills or adrenaline via the games own system, 4=Display between recipients only. 8=Ignore printing pills and adrenaline and use game prompt only. Add numbers together.", CVAR_FLAGS);
+	g_hCvarNotify =			CreateConVar(	"l4d_gear_transfer_notify",			"1",			"0=Off, 1=Display transfers to everyone, 2=Also display when transferring pills/adrenaline via the games own system, 4=Display between recipients only. 8=Ignore printing pills/adrenaline and use game prompt only. Add numbers together.", CVAR_FLAGS);
 	g_hCvarSounds =			CreateConVar(	"l4d_gear_transfer_sounds",			"1",			"0=Off, 1=Play a sound to the person giving/receiving an item.", CVAR_FLAGS);
 	g_hCvarTimerGive =		CreateConVar(	"l4d_gear_transfer_timer_give",		"1.0",			"0.0=Off. How often to check survivor bot positions to real clients for auto give.", CVAR_FLAGS, true, 0.0, true, 10.0);
 	g_hCvarTimerGrab =		CreateConVar(	"l4d_gear_transfer_timer_grab",		"0.5",			"0.0=Off. How often to check survivor bot positions to item positions for auto grab.", CVAR_FLAGS, true, 0.0, true, 10.0);
