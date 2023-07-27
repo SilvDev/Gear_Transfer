@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.30"
+#define PLUGIN_VERSION		"2.31"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.31 (27-Jul-2023)
+	- Fixed compile error on SourceMod version 1.12. Thanks to "ur5efj" for reporting.
 
 2.30 (25-May-2023)
 	- Fixed items not always equipping and possibly the rare bug of them being stuck under players feet. Thanks to "little_froy" for reporting.
@@ -2291,7 +2294,7 @@ Action TimerAutoGrab(Handle timer)
 
 						SetNextTransfer(bot, 2.0);
 
-						FireEventsFootlocker(bot, EntRefToEntIndex(weapon), g_sPickups[type]);
+						FireEventsFootlocker(bot, EntRefToEntIndex(weapon), type);
 
 						Vocalize(bot, type);
 
@@ -2337,13 +2340,13 @@ Action TimerAutoGrab(Handle timer)
 // ====================================================================================================
 //					VARIOUS HELPERS
 // ====================================================================================================
-void FireEventsFootlocker(int client, int target, char[] sItem)
+void FireEventsFootlocker(int client, int target, int type)
 {
 	Event hEvent = CreateEvent("item_pickup", true);
 	if( hEvent != null )
 	{
 		hEvent.SetInt("userid", GetClientUserId(client));
-		hEvent.SetString("item", sItem);
+		hEvent.SetString("item", g_sPickups[type]);
 		hEvent.Fire();
 	}
 
