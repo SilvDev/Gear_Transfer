@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.31"
+#define PLUGIN_VERSION		"2.32"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.32 (20-Dec-2023)
+	- Added cvar "l4d_gear_transfer_start" to block auto grab/give for a specified time on round start. Requested by "Iciaria".
 
 2.31 (27-Jul-2023)
 	- Fixed compile error on SourceMod version 1.12. Thanks to "ur5efj" for reporting.
@@ -403,13 +406,13 @@
 
 
 // Cvar handles
-ConVar g_hCvarAllow, g_hCvarDying, g_hCvarDistGive, g_hCvarDistGrab, g_hCvarGive, g_hCvarGrab, g_hCvarIdle, g_hCvarMethod, g_hCvarModesBot, g_hCvarModesOn, g_hCvarModesOff, g_hCvarModesTog, g_hCvarNotify, g_hCvarNotifies, g_hCvarSounds, g_hCvarTimeout, g_hCvarTimerGive, g_hCvarTimerGrab, g_hCvarTraces, g_hCvarTypes, g_hCvarVocalize;
+ConVar g_hCvarAllow, g_hCvarDying, g_hCvarDistGive, g_hCvarDistGrab, g_hCvarGive, g_hCvarGrab, g_hCvarIdle, g_hCvarMethod, g_hCvarModesBot, g_hCvarModesOn, g_hCvarModesOff, g_hCvarModesTog, g_hCvarNotify, g_hCvarNotifies, g_hCvarSounds, g_hCvarStart, g_hCvarTimeout, g_hCvarTimerGive, g_hCvarTimerGrab, g_hCvarTraces, g_hCvarTypes, g_hCvarVocalize;
 ConVar g_hCvarMPGameMode, g_hCvarMaxIncap;
 
 // Cvar variables
 int g_iCvarMaxIncap, g_iCvarDying, g_iCvarGive, g_iCvarGrab, g_iCvarMethod, g_iCvarNotify, g_iCvarNotifies, g_iCvarTypes, g_iCvarTraces, g_iCvarVocalize;
 bool g_bCvarSounds, g_bCvarIdle;
-float g_fDistGive, g_fDistGrab, g_fTimerGive, g_fTimerGrab, g_fCvarTimeout, g_fBlockVocalize;
+float g_fDistGive, g_fDistGrab, g_fCvarStart, g_fTimerGive, g_fTimerGrab, g_fCvarTimeout, g_fBlockVocalize, g_fStartTime;
 
 // Variables
 bool g_bCvarAllow, g_bMapStarted, g_bModeOffAuto, g_bRoundOver, g_bRoundIntro, g_bTranslation, g_bTranslationNew, g_bLeft4Dead2;
@@ -691,6 +694,7 @@ public void OnPluginStart()
 	g_hCvarNotifies =		CreateConVar(	"l4d_gear_transfer_notifies",		"7",			"Notify on these types of transfers: 1=Give, 2=Grab, 4=Switch, 7=All. Add numbers together.", CVAR_FLAGS);
 	g_hCvarNotify =			CreateConVar(	"l4d_gear_transfer_notify",			"1",			"0=Off, 1=Display transfers to everyone, 2=Also display when transferring pills/adrenaline via the games own system, 4=Display between recipients only. 8=Ignore printing pills/adrenaline and use game prompt only. Add numbers together.", CVAR_FLAGS);
 	g_hCvarSounds =			CreateConVar(	"l4d_gear_transfer_sounds",			"1",			"0=Off, 1=Play a sound to the person giving/receiving an item.", CVAR_FLAGS);
+	g_hCvarStart =			CreateConVar(	"l4d_gear_transfer_start",			"0.0",			"Block auto give and auto grab from round start for this many seconds.", CVAR_FLAGS);
 	g_hCvarTimerGive =		CreateConVar(	"l4d_gear_transfer_timer_give",		"1.0",			"0.0=Off. How often to check survivor bot positions to real clients for auto give.", CVAR_FLAGS, true, 0.0, true, 10.0);
 	g_hCvarTimerGrab =		CreateConVar(	"l4d_gear_transfer_timer_grab",		"0.5",			"0.0=Off. How often to check survivor bot positions to item positions for auto grab.", CVAR_FLAGS, true, 0.0, true, 10.0);
 	g_hCvarTimeout =		CreateConVar(	"l4d_gear_transfer_timeout",		"5.0",			"Timeout to stop bots returning an item after switching with a player. Timeout to prevent bots auto grabbing a recently dropped item.", CVAR_FLAGS, true, 1.0);
@@ -727,6 +731,7 @@ public void OnPluginStart()
 	g_hCvarNotify.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarNotifies.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarSounds.AddChangeHook(ConVarChanged_Cvars);
+	g_hCvarStart.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarTimeout.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarTimerGive.AddChangeHook(ConVarChanged_Cvars);
 	g_hCvarTimerGrab.AddChangeHook(ConVarChanged_Cvars);
@@ -770,6 +775,9 @@ public void OnMapEnd()
 
 void ResetPlugin()
 {
+	g_fBlockVocalize = 0.0;
+	g_fStartTime = 0.0;
+
 	for( int i = 1; i <= MaxClients; i++ )
 	{
 		g_fNextTransfer[i] = 0.0;
@@ -874,6 +882,7 @@ void GetCvars()
 	g_iCvarNotify = g_hCvarNotify.IntValue;
 	g_iCvarNotifies = g_hCvarNotifies.IntValue;
 	g_bCvarSounds = g_hCvarSounds.BoolValue;
+	g_fCvarStart = g_hCvarStart.FloatValue;
 	g_fCvarTimeout = g_hCvarTimeout.FloatValue;
 	g_fTimerGive = g_hCvarTimerGive.FloatValue;
 	g_fTimerGrab = g_hCvarTimerGrab.FloatValue;
@@ -1102,6 +1111,7 @@ void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 	#endif
 
 	g_bRoundOver = false;
+	g_fStartTime = GetGameTime();
 
 	// Vocalize block
 	if( g_iCvarVocalize && (g_iCvarGive || g_iCvarGrab) )
@@ -1834,6 +1844,7 @@ Action TimerAutoGive(Handle timer)
 	}
 
 	if( g_bRoundIntro ) return Plugin_Continue;
+	if( g_fCvarStart && g_fStartTime + g_fCvarStart > GetGameTime() ) return Plugin_Continue;
 
 	#if BENCHMARK
 	StartProfiling(g_Profiler);
@@ -1942,7 +1953,7 @@ Action TimerAutoGive(Handle timer)
 										// Validate receiver is black and white for first aid/pills/adrenaline
 										if( g_iCvarDying )
 										{
-											switch( type -1 )
+											switch( type - 1 )
 											{
 												case TYPE_FIRST:
 												{
