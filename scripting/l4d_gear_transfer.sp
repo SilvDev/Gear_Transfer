@@ -1,6 +1,6 @@
 /*
 *	Gear Transfer
-*	Copyright (C) 2023 Silvers
+*	Copyright (C) 2024 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.32"
+#define PLUGIN_VERSION		"2.33"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.33 (28-Jan-2024)
+	- Fixed memory leak caused by clearing StringMap/ArrayList data instead of deleting.
 
 2.32 (20-Dec-2023)
 	- Added cvar "l4d_gear_transfer_start" to block auto grab/give for a specified time on round start. Requested by "Iciaria".
@@ -798,12 +801,25 @@ void ResetPlugin()
 
 void ResetItemArray()
 {
-	g_ListMeds.Clear();
-	g_ListNade.Clear();
-	g_ListPack.Clear();
-	g_TypeMeds.Clear();
-	g_TypeNade.Clear();
-	g_TypePack.Clear();
+	// .Clear() is creating a memory leak
+	// g_ListMeds.Clear();
+	// g_ListNade.Clear();
+	// g_ListPack.Clear();
+	// g_TypeMeds.Clear();
+	// g_TypeNade.Clear();
+	// g_TypePack.Clear();
+	delete g_ListMeds;
+	delete g_ListNade;
+	delete g_ListPack;
+	delete g_TypeMeds;
+	delete g_TypeNade;
+	delete g_TypePack;
+	g_ListMeds = new ArrayList();
+	g_ListNade = new ArrayList();
+	g_ListPack = new ArrayList();
+	g_TypeMeds = new ArrayList();
+	g_TypeNade = new ArrayList();
+	g_TypePack = new ArrayList();
 }
 
 public void OnClientPutInServer(int client)
