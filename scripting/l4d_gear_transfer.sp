@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.33"
+#define PLUGIN_VERSION		"2.34"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.34 (17-Jun-2024)
+	- Fixed compile errors on SM 1.12. Thanks to "TheStarRocker" vor reporting.
 
 2.33 (28-Jan-2024)
 	- Fixed memory leak caused by clearing StringMap/ArrayList data instead of deleting.
@@ -1258,7 +1261,7 @@ void Event_WeaponGiven(Event event, const char[] name, bool dontBroadcast)
 			}
 			else
 			{
-				CPrintToChatAll("\x05%N \x01%t \x04%t \x01%t \x05%N", giver, "Gave", g_sPickups[type], "To", client);
+				CPrintToChatAll(client, "\x05%N \x01%t \x04%t \x01%t \x05%N", giver, "Gave", g_sPickups[type], "To", client);
 			}
 		}
 
@@ -1586,7 +1589,7 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 				if( g_bTranslationNew )
 					MPrintToChatAll(client, "Gave", g_sPickups[type], target);
 				else
-					CPrintToChatAll("\x05%N \x01%t \x04%t \x01%t \x05%N", client, "Gave", g_sPickups[type], "To", target);
+					CPrintToChatAll(target, "\x05%N \x01%t \x04%t \x01%t \x05%N", client, "Gave", g_sPickups[type], "To", target);
 			}
 		}
 		else if( transferType == METHOD_GRAB && g_iCvarNotifies & NOTIFY_GRAB )
@@ -1596,7 +1599,7 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 				if( g_bTranslationNew )
 					MPrintToChatAll(client, "Grabbed", g_sPickups[type], target);
 				else
-					CPrintToChatAll("\x05%N \x01%t \x04%t \x01%t \x05%N", client, "Grabbed", g_sPickups[type], "From", target);
+					CPrintToChatAll(target, "\x05%N \x01%t \x04%t \x01%t \x05%N", client, "Grabbed", g_sPickups[type], "From", target);
 			}
 		}
 		else if( transferType == METHOD_SWAP && g_iCvarNotifies & NOTIFY_SWITCH )
@@ -1608,7 +1611,7 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 				if( g_bTranslationNew )
 					MPrintToChatAll(client, "Switched", g_sPickups[type], target);
 				else
-					CPrintToChatAll("\x05%N \x01%t \x04%t \x01%t \x05%N", client, "Switched", g_sPickups[type], "With", target);
+					CPrintToChatAll(target, "\x05%N \x01%t \x04%t \x01%t \x05%N", client, "Switched", g_sPickups[type], "With", target);
 			}
 
 			type = g_iClientType[target][slot] - 1;
@@ -1618,7 +1621,7 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 				if( g_bTranslationNew )
 					MPrintToChatAll(target, "Gave", g_sPickups[type], client);
 				else
-					CPrintToChatAll("\x05%N \x01%t \x04%t \x01%t \x05%N", target, "Gave", g_sPickups[type], "To", client);
+					CPrintToChatAll(client, "\x05%N \x01%t \x04%t \x01%t \x05%N", target, "Gave", g_sPickups[type], "To", client);
 			}
 		}
 	}
@@ -2330,7 +2333,7 @@ Action TimerAutoGrab(Handle timer)
 							if( g_bTranslationNew )
 								MPrintToChatAll(bot, "BotGrabbed", g_sPickups[type], 0);
 							else
-								CPrintToChatAll("\x05%N \x01%t \x04%t", bot, "Grabbed", g_sPickups[type]);
+								CPrintToChatAll(0, "\x05%N \x01%t \x04%t", bot, "Grabbed", g_sPickups[type]);
 						}
 
 						// break;
@@ -2666,7 +2669,7 @@ void PlaySound(int client, const char sound[32])
 // ====================================================================================================
 // Taken from:
 // https://docs.sourcemod.net/api/index.php?fastload=show&id=151&
-void CPrintToChatAll(const char[] format, any ..., int client = 0)
+void CPrintToChatAll(int client, const char[] format, any ...)
 {
 	static char buffer[192];
 
@@ -2686,7 +2689,7 @@ void CPrintToChatAll(const char[] format, any ..., int client = 0)
 			if( IsClientInGame(i) && !IsFakeClient(i) )
 			{
 				SetGlobalTransTarget(i);
-				VFormat(buffer, sizeof(buffer), format, 2);
+				VFormat(buffer, sizeof(buffer), format, 3);
 				PrintToChat(i, buffer);
 			}
 		}
