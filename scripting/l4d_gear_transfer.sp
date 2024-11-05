@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.34"
+#define PLUGIN_VERSION		"2.35"
 
 /*======================================================================================
 	Plugin Info:
@@ -32,8 +32,11 @@
 ========================================================================================
 	Change Log:
 
+2.35 (05-Nov-2024)
+	- Fixed invalid client error, likely due to 3rd party plugin. Thanks to "voledar" for reporting.
+
 2.34 (17-Jun-2024)
-	- Fixed compile errors on SM 1.12. Thanks to "TheStarRocker" vor reporting.
+	- Fixed compile errors on SM 1.12. Thanks to "TheStarRocker" for reporting.
 
 2.33 (28-Jan-2024)
 	- Fixed memory leak caused by clearing StringMap/ArrayList data instead of deleting.
@@ -1238,6 +1241,8 @@ void Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
 void Event_WeaponGiven(Event event, const char[] name, bool dontBroadcast)
 {
 	int giver = GetClientOfUserId(event.GetInt("giver"));
+	if( !giver ) return;
+
 	if( !IsFakeClient(giver) )
 		SetNextTransfer(giver, 2.0);
 
