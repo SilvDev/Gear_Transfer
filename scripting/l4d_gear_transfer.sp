@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.35"
+#define PLUGIN_VERSION		"2.36"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,9 @@
 
 ========================================================================================
 	Change Log:
+
+2.36 (15-Dec-2024)
+	- Now fires the "spawner_give_item" event where required. Thanks to "little_froy" for updating.
 
 2.35 (05-Nov-2024)
 	- Fixed invalid client error, likely due to 3rd party plugin. Thanks to "voledar" for reporting.
@@ -2329,7 +2332,7 @@ Action TimerAutoGrab(Handle timer)
 
 						SetNextTransfer(bot, 2.0);
 
-						FireEventsFootlocker(bot, EntRefToEntIndex(weapon), type);
+						FireEventsFootlocker(bot, EntRefToEntIndex(weapon), type, spawner);
 
 						Vocalize(bot, type);
 
@@ -2375,7 +2378,7 @@ Action TimerAutoGrab(Handle timer)
 // ====================================================================================================
 //					VARIOUS HELPERS
 // ====================================================================================================
-void FireEventsFootlocker(int client, int target, int type)
+void FireEventsFootlocker(int client, int target, int type, bool spawner)
 {
 	Event hEvent = CreateEvent("item_pickup", true);
 	if( hEvent != null )
@@ -2383,6 +2386,18 @@ void FireEventsFootlocker(int client, int target, int type)
 		hEvent.SetInt("userid", GetClientUserId(client));
 		hEvent.SetString("item", g_sPickups[type]);
 		hEvent.Fire();
+	}
+
+	if(spawner)
+	{
+		hEvent = CreateEvent("spawner_give_item", true);
+		if( hEvent != null )
+		{
+			hEvent.SetInt("userid", GetClientUserId(client));
+			hEvent.SetString("item", g_sPickups[type]);
+			hEvent.SetInt("spawner", target);
+			hEvent.Fire();
+		}
 	}
 
 	hEvent = CreateEvent("player_use", true);
