@@ -1,6 +1,6 @@
 /*
 *	Gear Transfer
-*	Copyright (C) 2024 Silvers
+*	Copyright (C) 2026 Silvers
 *
 *	This program is free software: you can redistribute it and/or modify
 *	it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 
 
-#define PLUGIN_VERSION		"2.36"
+#define PLUGIN_VERSION		"2.37"
 
 /*======================================================================================
 	Plugin Info:
@@ -31,6 +31,10 @@
 
 ========================================================================================
 	Change Log:
+
+2.37 (18-Jun-2026)
+	- Added vocalize for players to say when they are giving an item. Requested by "TBK Duy".
+	- Fixed errors if "BENCHMARK" define was set to "1".
 
 2.36 (15-Dec-2024)
 	- Now fires the "spawner_give_item" event where required. Thanks to "little_froy" for updating.
@@ -390,21 +394,20 @@
 // Auto Give/Grab functions can exit leaving profiler enabled. I don't care to waste time fixing this.
 // This should only be used for testing and not on a live server as the profiler and spew will cause excess lag.
 #define BENCHMARK				0
-#if BENCHMARK
-	#include <profiler>
-	Handle g_Profiler;
 
-	#if BENCHMARK == 2
-		static float g_fBenchGiveMin;
-		static float g_fBenchGiveAvg;
-		static float g_fBenchGiveMax;
-		static int g_iBenchGiveTicks;
-		static float g_fBenchGrabMin;
-		static float g_fBenchGrabAvg;
-		static float g_fBenchGrabMax;
-		static int g_iBenchGrabTicks;
-		static bool g_bProfiling;
-	#endif
+#if BENCHMARK == 2
+	#include <profiler>
+
+	Handle g_Profiler;
+	static float g_fBenchGiveMin;
+	static float g_fBenchGiveAvg;
+	static float g_fBenchGiveMax;
+	static int g_iBenchGiveTicks;
+	static float g_fBenchGrabMin;
+	static float g_fBenchGrabAvg;
+	static float g_fBenchGrabMax;
+	static int g_iBenchGrabTicks;
+	static bool g_bProfiling;
 #endif
 
 
@@ -535,7 +538,7 @@ static const char g_sPickups[9][] =
 
 int g_Lengths[9];
 
-// Vocalize for Left 4 Dead 2
+// Take vocalize for Left 4 Dead 2
 static const char g_Coach[8][] =
 {
 	"takepipebomb01", "takepipebomb02", "takepipebomb03", "takemolotov01", "takemolotov02", "takefirstaid01", "takefirstaid02", "takefirstaid03"
@@ -556,7 +559,7 @@ static const char g_Rochelle[9][] =
 	"takefirstaid03"
 };
 
-// Vocalize for Left 4 Dead
+// Take vocalize for Left 4 Dead
 static const char g_Bill[10][] =
 {
 	"TakePipeBomb01", "TakePipeBomb02", "TakePipeBomb03", "TakePipeBomb04", "TakeMolotov01", "TakeMolotov02", "TakeMolotov03", "TakeFirstAid01",
@@ -576,6 +579,47 @@ static const char g_Zoey[10][] =
 {
 	"TakePipeBomb02", "takepipebomb04", "TakeMolotov02", "takemolotov04", "takemolotov05", "takemolotov07", "TakeFirstAid01", "TakeFirstAid02",
 	"TakeFirstAid03", "takefirstaid05"
+};
+
+// Give vocalize for Left 4 Dead 2
+static const char g_GiveCoach[13][] =
+{
+	"AlertGiveItem01", "AlertGiveItem02", "AlertGiveItem03", "AlertGiveItem04", "AlertGiveItem05", "AlertGiveItemC101", "AlertGiveItemC102",
+	"AlertGiveItemC103", "AlertGiveItemCombat01", "AlertGiveItemCombat02", "AlertGiveItemCombat03", "AlertGiveItemCombat04", "AlertGiveItemCombat05"
+};
+static const char g_GiveEllis[12][] =
+{
+	"AlertGiveItem01", "AlertGiveItem02", "AlertGiveItem03", "AlertGiveItem04", "AlertGiveItem05", "AlertGiveItem06", "AlertGiveItem07",
+	"AlertGiveItem08", "AlertGiveItemCombat01", "AlertGiveItemCombat02", "AlertGiveItemCombat03", "AlertGiveItemCombat04"
+};
+static const char g_GiveNick[11][] =
+{
+	"AlertGiveItem01", "AlertGiveItem02", "AlertGiveItem03", "AlertGiveItem04", "AlertGiveItem05", "AlertGiveItem06", "AlertGiveItemC101",
+	"AlertGiveItemC102", "AlertGiveItemCombat01", "AlertGiveItemCombat02", "AlertGiveItemCombat03"
+};
+static const char g_GiveRochelle[12][] =
+{
+	"AlertGiveItem01", "AlertGiveItem02", "AlertGiveItem03", "AlertGiveItem04", "AlertGiveItem05", "AlertGiveItemC101", "AlertGiveItemCombat01",
+	"AlertGiveItemCombat02", "AlertGiveItemCombat03", "AlertGiveItemCombat04", "AlertGiveItemCombat05", "AlertGiveItemCombat06"
+};
+
+// Give vocalize for Left 4 Dead
+static const char g_GiveBill[7][] =
+{
+	"AlertGiveItem01", "AlertGiveItem02", "AlertGiveItem03", "AlertGiveItem04", "AlertGiveItem05", "AlertGiveItem06", "AlertGiveItem07"
+};
+static const char g_GiveFrancis[6][] =
+{
+	"AlertGiveItem01", "AlertGiveItem02", "AlertGiveItem03", "AlertGiveItem05", "AlertGiveItem06", "AlertGiveItem07"
+};
+static const char g_GiveLouis[7][] =
+{
+	"AlertGiveItem01", "AlertGiveItem02", "AlertGiveItem03", "AlertGiveItem04", "AlertGiveItem05", "AlertGiveItem06", "AlertGiveItem07"
+};
+static const char g_GiveZoey[10][] =
+{
+	"AlertGiveItem01", "AlertGiveItem03", "AlertGiveItem05", "AlertGiveItem07", "AlertGiveItem09", "AlertGiveItem11", "AlertGiveItem12",
+	"AlertGiveItem14", "AlertGiveItem15", "AlertGiveItem16"
 };
 
 
@@ -764,7 +808,7 @@ public void OnPluginStart()
 
 	IsAllowed();
 
-	#if BENCHMARK
+	#if BENCHMARK == 2
 	g_Profiler = CreateProfiler();
 	#endif
 }
@@ -1574,9 +1618,18 @@ void GiveItem(int client, int target, int item, int slot, int type, int transfer
 	if( g_iCvarVocalize )
 	{
 		if( transferType == METHOD_GRAB )
+		{
 			Vocalize(client, type);
+		}
 		else if( transferType == METHOD_GIVE )
-			Vocalize(target, type);
+		{
+			DataPack dPack;
+			CreateDataTimer(0.5, TimerVocalizeGive, dPack, TIMER_FLAG_NO_MAPCHANGE);
+			dPack.WriteCell(GetClientUserId(target));
+			dPack.WriteCell(type);
+
+			VocalizeGive(client);
+		}
 		else
 		{
 			type = g_iClientType[client][slot] - 1;
@@ -1787,7 +1840,7 @@ Action TimerSwapBack(Handle timer, int client)
 // ====================================================================================================
 public void OnEntityCreated(int entity, const char[] classname)
 {
-	#if BENCHMARK
+	#if BENCHMARK == 2
 	StartProfiling(g_Profiler);
 	g_bProfiling = true;
 	#endif
@@ -1827,7 +1880,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 						}
 					}
 
-					#if BENCHMARK
+					#if BENCHMARK == 2
 					StopProfiling(g_Profiler);
 					g_bProfiling = false;
 					float speed = GetProfilerTime(g_Profiler);
@@ -1840,7 +1893,7 @@ public void OnEntityCreated(int entity, const char[] classname)
 		}
 	}
 
-	#if BENCHMARK
+	#if BENCHMARK == 2
 	StopProfiling(g_Profiler);
 	g_bProfiling = false;
 	#endif
@@ -1873,7 +1926,7 @@ Action TimerAutoGive(Handle timer)
 	if( g_bRoundIntro ) return Plugin_Continue;
 	if( g_fCvarStart && g_fStartTime + g_fCvarStart > GetGameTime() ) return Plugin_Continue;
 
-	#if BENCHMARK
+	#if BENCHMARK == 2
 	StartProfiling(g_Profiler);
 	g_bProfiling = true;
 	#endif
@@ -2056,7 +2109,6 @@ Action TimerAutoGive(Handle timer)
 						GiveItem(bot, target, weapon, slot, type - 1, METHOD_GIVE);
 
 						#if BENCHMARK == 2
-
 						if( g_bProfiling )
 						{
 							StopProfiling(g_Profiler);
@@ -2114,11 +2166,9 @@ Action TimerAutoGrab(Handle timer)
 
 	if( g_bRoundIntro ) return Plugin_Continue;
 
-	#if BENCHMARK
+	#if BENCHMARK == 2
 	StartProfiling(g_Profiler);
 	g_bProfiling = true;
-	#endif
-	#if BENCHMARK == 2
 	#endif
 
 
@@ -2528,15 +2578,32 @@ bool IsValidEntRef(int entity)
 // ====================================================================================================
 //					VOCALIZE
 // ====================================================================================================
+Action TimerVocalizeGive(Handle timer, DataPack dPack)
+{
+	if( g_bRoundOver ) return Plugin_Continue;
+
+	dPack.Reset();
+
+	int client = dPack.ReadCell();
+	client = GetClientOfUserId(client);
+
+	if( client && IsClientInGame(client) )
+	{
+		int type = dPack.ReadCell();
+
+		Vocalize(client, type);
+	}
+
+	return Plugin_Continue;
+}
+
 void Vocalize(int client, int type)
 {
-	if( g_iCvarVocalize == 0 || GetGameTime() < g_fBlockVocalize )
-		return;
+	// Vocalize blocked time
+	if( g_iCvarVocalize == 0 || GetGameTime() < g_fBlockVocalize ) return;
 
 	// Don't need to vocalize these
 	if( type != TYPE_PIPE && type != TYPE_MOLO && type != TYPE_FIRST ) return;
-
-
 
 	// Declare variables
 	int surv, min, max;
@@ -2654,6 +2721,93 @@ void Vocalize(int client, int type)
 	}
 
 	// Create scene location and call
+	Format(sTemp, sizeof(sTemp), "scenes/%s/%s.vcd", model, sTemp);
+	VocalizeScene(client, sTemp);
+}
+
+void VocalizeGive(int client)
+{
+	// Vocalize blocked time
+	if( g_iCvarVocalize == 0 || GetGameTime() < g_fBlockVocalize ) return;
+
+	// Declare variables
+	int surv, max;
+	static char model[40];
+
+	// Get survivor model
+	GetEntPropString(client, Prop_Data, "m_ModelName", model, sizeof(model));
+
+	switch( model[29] )
+	{
+		case 'c': { model = "coach";		surv = 1; }
+		case 'b': { model = "gambler";		surv = 2; }
+		case 'h': { model = "mechanic";		surv = 3; }
+		case 'd': { model = "producer";		surv = 4; }
+		case 'v': { model = "NamVet";		surv = 5; }
+		case 'e': { model = "Biker";		surv = 6; }
+		case 'a': { model = "Manager";		surv = 7; }
+		case 'n': { model = "TeenGirl";		surv = 8; }
+		default:
+		{
+			int character = GetEntProp(client, Prop_Send, "m_survivorCharacter");
+
+			if( g_bLeft4Dead2 )
+			{
+				switch( character )
+				{
+					case 0:	{ model = "gambler";		surv = 2; } // Nick
+					case 1:	{ model = "producer";		surv = 4; } // Rochelle
+					case 2:	{ model = "coach";			surv = 1; } // Coach
+					case 3:	{ model = "mechanic";		surv = 3; } // Ellis
+					case 4:	{ model = "NamVet";			surv = 5; } // Bill
+					case 5:	{ model = "TeenGirl";		surv = 8; } // Zoey
+					case 6:	{ model = "Biker";			surv = 6; } // Francis
+					case 7:	{ model = "Manager";		surv = 7; } // Louis
+				}
+			} else {
+				switch( character )
+				{
+					case 0:	 { model = "TeenGirl";		surv = 8; } // Zoey
+					case 1:	 { model = "NamVet";		surv = 5; } // Bill
+					case 2:	 { model = "Biker";			surv = 6; } // Francis
+					case 3:	 { model = "Manager";		surv = 7; } // Louis
+				}
+			}
+		}
+	}
+
+	// Failed for some reason? Should never happen.
+	if( surv == 0 )
+		return;
+
+	// Random number
+	int random = GetRandomInt(0, max);
+
+	switch( surv )
+	{
+		case 1: random = GetRandomInt(0, sizeof(g_GiveCoach) - 1);
+		case 2: random = GetRandomInt(0, sizeof(g_GiveNick) - 1);
+		case 3: random = GetRandomInt(0, sizeof(g_GiveEllis) - 1);
+		case 4: random = GetRandomInt(0, sizeof(g_GiveRochelle) - 1);
+		case 5: random = GetRandomInt(0, sizeof(g_GiveBill) - 1);
+		case 6: random = GetRandomInt(0, sizeof(g_GiveFrancis) - 1);
+		case 7: random = GetRandomInt(0, sizeof(g_GiveLouis) - 1);
+		case 8: random = GetRandomInt(0, sizeof(g_GiveZoey) - 1);
+	}
+
+	static char sTemp[40];
+	switch( surv )
+	{
+		case 1: Format(sTemp, sizeof(sTemp), g_GiveCoach[random]);
+		case 2: Format(sTemp, sizeof(sTemp), g_GiveNick[random]);
+		case 3: Format(sTemp, sizeof(sTemp), g_GiveEllis[random]);
+		case 4: Format(sTemp, sizeof(sTemp), g_GiveRochelle[random]);
+		case 5: Format(sTemp, sizeof(sTemp), g_GiveBill[random]);
+		case 6: Format(sTemp, sizeof(sTemp), g_GiveFrancis[random]);
+		case 7: Format(sTemp, sizeof(sTemp), g_GiveLouis[random]);
+		case 8: Format(sTemp, sizeof(sTemp), g_GiveZoey[random]);
+	}
+
 	Format(sTemp, sizeof(sTemp), "scenes/%s/%s.vcd", model, sTemp);
 	VocalizeScene(client, sTemp);
 }
